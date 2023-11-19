@@ -3,10 +3,19 @@
 #include <PubSubClient.h>
 #include <NTPClient.h> // https://github.com/arduino-libraries/NTPClient
 
+struct Button
+{
+    const uint8_t PIN;
+    bool pressed;
+    int buttonState;
+    int lastButtonState;
+    unsigned long int lastBounceTime;
+};
+
 #define LED 2
-#define Sensor01 4
-#define Sensor02 32
-#define Sensor03 33
+Button sensorAberto = {4, false, LOW, LOW, 0};
+Button sensorMeio = {18, false, LOW, LOW, 0};
+Button sensorFechado = {19, false, LOW, LOW, 0};
 
 #define wifi_ssid "imd0902"
 #define wifi_password "imd0902iot"
@@ -19,11 +28,21 @@ String hora;
 
 void connectWiFi();
 
+// Funções de interrupção dos sensores
+void IRAM_ATTR interrupcaoFechado();
+void IRAM_ATTR interrupcaoMeio();
+void IRAM_ATTR interrupcaoAberto();
+void debounceBotao(Button *button); // função de debounce
+unsigned long int debounceDelay = 50;
+
 void setup()
 {
-    pinMode(Sensor01, INPUT);
-    pinMode(Sensor02, INPUT);
-    pinMode(Sensor03, INPUT);
+    pinMode(sensorAberto.PIN, INPUT);
+    pinMode(sensorMeio.PIN, INPUT);
+    pinMode(sensorFechado.PIN, INPUT);
+    attachInterrupt(sensorAberto.PIN, interrupcaoAberto, CHANGE);
+    attachInterrupt(sensorMeio.PIN, interrupcaoMeio, CHANGE);
+    attachInterrupt(sensorFechado.PIN, interrupcaoFechado, CHANGE);
     pinMode(LED, OUTPUT);
     Serial.begin(115200);
 
@@ -37,17 +56,25 @@ void setup()
 void loop()
 {
     /* Leitura dos sensores */
-    int sensorInicio = digitalRead(Sensor01);
-    // int sensorMeio = digitalRead(Sensor02);
-    // int sensorFim = digitalRead(Sensor03);
 
-    if (sensorInicio == 0)
+    // Executa ações de acordo com os sinais dos botões. Seta pra false pra a ação não ser executada mais de uma vez
+    if (sensorAberto.pressed)
     {
-        digitalWrite(LED, HIGH);
+        sensorAberto.pressed = false;
+        Serial.println("Aberto");
+        // chamar função de abrir portão aqui
     }
-    else
+    if (sensorMeio.pressed)
     {
-        digitalWrite(LED, LOW);
+        sensorMeio.pressed = false;
+        Serial.println("Meio");
+        // chamar função de meio de portao aqui
+    }
+    if (sensorFechado.pressed)
+    {
+        sensorFechado.pressed = false;
+        Serial.println("Fechado");
+        // chamar função de portao fechado aqui
     }
 }
 
@@ -72,5 +99,38 @@ void connectWiFi()
     {
         Serial.print("Conectado com o IP: ");
         Serial.println(WiFi.localIP());
+    }
+}
+
+// Declaração das funçoẽs de interrupção
+void IRAM_ATTR interrupcaoFechado()
+{
+    debounceBotao(&sensorFechado);
+};
+void IRAM_ATTR interrupcaoMeio()
+{
+    debounceBotao(&sensorMeio);
+};
+void IRAM_ATTR interrupcaoAberto()
+{
+    debounceBotao(&sensorAberto);
+};
+
+void debounceBotao(Button *button)
+{
+    button->buttonState = digitalRead(button->PIN);
+    // O debounce só acontece se o botão mudar de estado
+    if ((millis() - button->lastBounceTime > debounceDelay) && button->buttonState != button->lastButtonState)
+    {
+        if (button->buttonState == HIGH)
+        {
+            button->pressed = true;
+            button->lastButtonState = HIGH;
+        }
+        else
+        {
+            button->lastButtonState = LOW;
+        }
+        button->lastBounceTime = millis();
     }
 }
