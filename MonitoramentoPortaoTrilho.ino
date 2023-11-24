@@ -2,6 +2,7 @@
 #include <WiFiClient.h>
 #include <PubSubClient.h>
 #include <NTPClient.h> // https://github.com/arduino-libraries/NTPClient
+#include "SPIFFS.h"
 
 struct Button
 {
@@ -17,16 +18,25 @@ Button sensorAberto = {4, false, LOW, LOW, 0};
 Button sensorMeio = {18, false, LOW, LOW, 0};
 Button sensorFechado = {19, false, LOW, LOW, 0};
 
-#define wifi_ssid "imd0902"
-#define wifi_password "imd0902iot"
+#define wifi_ssid "NPITI-IoT"
+#define wifi_password "NPITI-IoT"
 
 int wifi_timeout = 100000;
+
+/* Variaveis de arquivo */
+String path, state, s;
 
 WiFiUDP udp;
 NTPClient ntp(udp, "a.st1.ntp.br", -3 * 3600, 60000); // Cria um objeto "NTP" com as configurações.utilizada no Brasil
 String hora;
 
 void connectWiFi();
+
+/* Definição Funções de Interação com arquivos */
+void writeFile(String state, String path, String hora);
+String readFile(String path);
+void formatFile();
+void openFS();
 
 // Funções de interrupção dos sensores
 void IRAM_ATTR interrupcaoFechado();
@@ -54,6 +64,8 @@ void setup()
     pinMode(LED, OUTPUT);
     Serial.begin(115200);
 
+    //formatFile()
+
     WiFi.mode(WIFI_STA); //"station mode": permite o ESP32 ser um cliente da rede WiFi
     WiFi.begin(wifi_ssid, wifi_password);
     connectWiFi();
@@ -63,8 +75,6 @@ void setup()
 }
 void loop()
 {
-    /* Leitura dos sensores */
-
     // Executa ações de acordo com os sinais dos botões. Seta pra false pra a ação não ser executada mais de uma vez
     if (sensorAberto.pressed)
     {
@@ -119,11 +129,13 @@ void connectWiFi()
     if (WiFi.status() != WL_CONNECTED)
     {
         Serial.println("Conexão com WiFi falhou!");
+        digitalWrite(LED, LOW);
     }
     else
     {
         Serial.print("Conectado com o IP: ");
         Serial.println(WiFi.localIP());
+        digitalWrite(LED, HIGH);
     }
 }
 
@@ -168,3 +180,83 @@ void contarTempoAberto()
 {
     tempoAberto += millis();
 };
+
+/* Funções de interação arquivos ESP */
+
+void writeFile(String state, String path, String hora)
+{
+  File rFile = SPIFFS.open(path, "r+"); // 'r+' para leitura e escrita
+
+  if (!rFile)
+  {
+    Serial.println("Erro ao abrir arquivo!");
+    return;
+  }
+
+  rFile.seek(0); // Mover o cursor para o início do arquivo
+
+  int lineCount = 0;
+  int maxLines = 10;
+  String lines[maxLines];
+
+  // Ler linhas do arquivo
+  while (rFile.position() < rFile.size())
+  {
+    lines[lineCount] = rFile.readStringUntil('\n');
+    lineCount++;
+  }
+
+  rFile.seek(0); // Mover o cursor para o início do arquivo
+
+  if (lineCount / 2 >= maxLines) // Se atingir o máximo de elementos, sobrescrever a partir da segunda entrada
+    rFile.seek(lines[2].length() + lines[3].length() + 4); // 4 é a quantidade de caracteres adicionados por println
+
+  // Escrever no arquivo
+  rFile.println(hora);
+  rFile.println(state);
+  Serial.println("Gravou!");
+
+  rFile.close();
+}
+
+
+String readFile(String path)
+{
+  Serial.println("Read file");
+  File rFile = SPIFFS.open(path, "r"); // r+ leitura e escrita
+  if (!rFile)
+  {
+    Serial.println("Erro ao abrir arquivo!");
+    s = "";
+
+    return s;
+  }
+
+  else
+  {
+    Serial.print("---------- Lendo arquivo " + path + "  ---------");
+    while (rFile.position() < rFile.size())
+    {
+      String line = rFile.readStringUntil('\n'); // Lê uma linha do arquivo
+      Serial.println(line);
+      s = line;
+    }
+    rFile.close();
+
+    return s;
+  }
+}
+
+void formatFile()
+{
+  SPIFFS.format();
+  Serial.println("Formatou SPIFFS");
+}
+
+void openFS(void)
+{
+  if (!SPIFFS.begin())
+    Serial.println("\nErro ao abrir o sistema de arquivos");
+  else
+    Serial.println("\nSistema de arquivos aberto com sucesso!");
+}
