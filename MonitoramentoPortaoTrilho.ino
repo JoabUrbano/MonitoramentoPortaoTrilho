@@ -45,6 +45,14 @@ void IRAM_ATTR interrupcaoAberto();
 void debounceBotao(Button *button); // função de debounce
 unsigned long int debounceDelay = 50;
 
+// a partir do momento que o portão é aberto, o tempo é contado
+// quando o portão for fechado, o tempo é resetado
+
+unsigned long int tempoAberto = 0;
+unsigned long int limiteTempoAberto = 60000; // 60 segundos
+void resetTempoAberto();
+void contarTempoAberto();
+
 void setup()
 {
     pinMode(sensorAberto.PIN, INPUT);
@@ -83,9 +91,26 @@ void loop()
     if (sensorFechado.pressed)
     {
         sensorFechado.pressed = false;
+        resetTempoAberto();
         Serial.println("Fechado");
         // chamar função de portao fechado aqui
     }
+    // se nenhum sersor está pressionado, o portão está em movimento
+    if (!sensorAberto.pressed && !sensorMeio.pressed && !sensorFechado.pressed)
+    {
+        Serial.println("Em movimento");
+        // chamar função de portao em movimento aqui
+        contarTempoAberto();
+    }
+
+    if (tempoAberto > limiteTempoAberto)
+    {
+        Serial.println("Portão aberto por mais de 60 segundos");
+        // chamar função de alerta aqui
+    }
+
+    // tratamento do tempo que o portão fica aberto
+    // se estiver aberto mais do que o tempo limite, enviar alerta
 }
 
 // Função para conectar o Esp ao Wifi
@@ -146,6 +171,15 @@ void debounceBotao(Button *button)
         button->lastBounceTime = millis();
     }
 }
+
+void resetTempoAberto()
+{
+    tempoAberto = 0;
+};
+void contarTempoAberto()
+{
+    tempoAberto += millis();
+};
 
 /* Funções de interação arquivos ESP */
 
