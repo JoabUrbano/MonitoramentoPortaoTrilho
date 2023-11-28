@@ -4,17 +4,24 @@
 
 Projeto que visa monitorar um portão automatico de trilho. É verificado se ele está aberto, fechado ou no meio do caminho. Se o portão fica aberto por muito tempo o usuario é notificado e pode fechalo remotamente.
 
+Também havera a feature de consultar os ultimos logs dos status do portão, com seu respectivo horario.
+
 Componentes utilizados no projeto:
 - Um Esp32 Dev Module
 - Jumpers
 - Três sensores magneticos de porta
-- Três resistores de 10K Ohm
+- Seis resistores de 10K Ohm
+- Um botão
+- Dois LEDs
 
 Bibliotecas necessarias para Esp32:
 - Wifi
 - WiFiClient
 - PubSubClient
 - NTPClient
+- SPIFFS
+- Fs
+- queue
 
 <h2>Como rodar o projeto?</h2>
 
