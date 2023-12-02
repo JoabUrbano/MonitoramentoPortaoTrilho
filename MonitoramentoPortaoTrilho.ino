@@ -66,10 +66,8 @@ unsigned long int debounceDelay = 50;
 // a partir do momento que o portão é aberto, o tempo é contado
 // quando o portão for fechado, o tempo é resetado
 
-unsigned long int tempoAberto = 0;
 unsigned long int limiteTempoAberto = 60000; // 60 segundos
-void resetTempoAberto();
-void contarTempoAberto();
+hw_timer_t *Timer0_Cfg = NULL;
 
 void acaoSensores();
 
@@ -83,11 +81,13 @@ void setup()
     attachInterrupt(sensorFechado.PIN, interrupcaoFechado, CHANGE);
     pinMode(LED, OUTPUT);
     Serial.begin(115200);
-    pinMode(23, OUTPUT);
+
+    Timer0_Cfg = timerBegin(0, 80, true);
+    timerWrite(Timer0_Cfg, 0);
 
     WiFi.mode(WIFI_STA); //"station mode": permite o ESP32 ser um cliente da rede WiFi
     WiFi.begin(wifi_ssid, wifi_password);
-    // connectWiFi();
+    connectWiFi();
 
     ntp.begin();       // Inicia o protocolo
     ntp.forceUpdate(); // Atualização
@@ -104,9 +104,14 @@ void loop()
     // Executa ações de acordo com os sinais dos botões.
     acaoSensores();
 
+    uint64_t tempoAberto = timerReadMilis(Timer0_Cfg);
+
     if (tempoAberto > limiteTempoAberto)
     {
         Serial.println("Portão aberto por mais de 60 segundos");
+        timerStop(Timer0_Cfg);
+        timerWrite(Timer0_Cfg, 0);
+
         // chamar função de alerta aqui
     }
 
@@ -130,13 +135,14 @@ void acaoSensores()
         estadoPortao = MEIO;
         Serial.println("Meio");
         hora = ntp.getFormattedTime();
-        // writeFile("Passou pelo meio", fileName, hora);
+        writeFile("Passou pelo meio", fileName, hora);
         // chamar função de meio de portao aqui
     }
     if (sensorFechado.pressed && estadoPortao != FECHADO)
     {
-        // resetTempoAberto();
         estadoPortao = FECHADO;
+        timerStop(Timer0_Cfg);
+        timerWrite(Timer0_Cfg, 0);
         Serial.println("Fechado");
         hora = ntp.getFormattedTime();
         writeFile("Fechou", fileName, hora);
@@ -147,8 +153,7 @@ void acaoSensores()
     if (!sensorAberto.pressed && !sensorMeio.pressed && !sensorFechado.pressed && estadoPortao != MOVIMENTO)
     {
         estadoPortao = MOVIMENTO;
-        // inciar timer
-        //  chamar função de portao em movimento aqui
+        timerStart(Timer0_Cfg);
     }
 };
 
