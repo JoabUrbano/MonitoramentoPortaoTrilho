@@ -1,10 +1,11 @@
 #include <WiFi.h>
 #include <WiFiClient.h>
-#include <PubSubClient.h>
 #include <NTPClient.h> // https://github.com/arduino-libraries/NTPClient
 #include "SPIFFS.h"
 #include <FS.h>
 #include <queue>
+
+#include <MQTTPubSubClient.h>
 
 std::queue<String> filaDeStrings;
 
@@ -37,7 +38,12 @@ Button sensorFechado = {19, false, LOW, LOW, 0};
 
 int wifi_timeout = 100000;
 
-unsigned long int ultimoClock;
+WiFiClient wifi_client;
+MQTTPubSubClient mqtt_client;
+
+#define mqtt_broker "homeassistant.local"
+const int mqtt_port = 1883;
+int mqtt_timeout = 10000;
 
 /* Variaveis de arquivo */
 String path, state;
@@ -49,6 +55,9 @@ NTPClient ntp(udp, "a.st1.ntp.br", -3 * 3600, 60000); // Cria um objeto "NTP" co
 String hora;
 
 void connectWiFi();
+void connectMQTT();
+
+bool mqtt_connected = false;
 
 /* Definição Funções de Interação com arquivos */
 void writeFile(String state, String path, String hora);
@@ -70,6 +79,22 @@ unsigned long int limiteTempoAberto = 60000; // 60 segundos
 hw_timer_t *Timer0_Cfg = NULL;
 
 void acaoSensores();
+
+bool comandoAbrir = false;
+bool comandoFechar = false;
+
+#define botaoControleAbrir 23
+#define botaoControleFechar 22
+
+void abrirPortao();
+void fecharPortao();
+void acaoControle(int botao);
+
+void tratarComandoMqtt(String comando);
+
+// criar uma task para executar as acoes do portao em outro core
+
+TaskHandle_t Core0;
 
 void setup()
 {
@@ -94,30 +119,72 @@ void setup()
 
     estadoPortao = FECHADO;
 
-    ultimoClock = millis();
+    connectMQTT();
+
+    mqtt_client.subscribe("/mosquitto/portao/comandos", [](const String &payload, const size_t size)
+                          {
+        Serial.print("/mosquitto/portao/comandos ");
+        tratarComandoMqtt(payload); });
+
+    xTaskCreatePinnedToCore(
+        Task1Code,
+        "Task1",
+        10000,
+        NULL,
+        1,
+        &Core0,
+        0);
+
+    delay(500);
 
     // formatFile();
     openFS();
 }
+
+void Task1Code(void *parameter)
+{
+    for (;;)
+    {
+        if (comandoAbrir)
+        {
+            abrirPortao();
+            comandoAbrir = false;
+        }
+        if (comandoFechar)
+        {
+            fecharPortao();
+            comandoFechar = false;
+        }
+        delay(100);
+    }
+}
+
 void loop()
 {
-    // Executa ações de acordo com os sinais dos botões.
-    acaoSensores();
 
-    uint64_t tempoAberto = timerReadMilis(Timer0_Cfg);
-
-    if (tempoAberto > limiteTempoAberto)
-    {
-        Serial.println("Portão aberto por mais de 60 segundos");
-        timerStop(Timer0_Cfg);
-        timerWrite(Timer0_Cfg, 0);
-
-        // chamar função de alerta aqui
+    if (!mqtt_connected)
+    {                  // Se MQTT não estiver conectado
+        connectMQTT(); // Tente se conectar ao broker
     }
 
-    // tratamento do tempo que o portão fica aberto
-    // se estiver aberto mais do que o tempo limite, enviar alerta
-    delay(100);
+    if (mqtt_connected)
+    { // Se MQTT estiver conectado
+
+        // Executa ações de acordo com os sinais dos botões.
+        acaoSensores();
+
+        uint64_t tempoAberto = timerReadMilis(Timer0_Cfg);
+
+        if (tempoAberto > limiteTempoAberto)
+        {
+            Serial.println("Portão aberto por mais de 60 segundos");
+            timerStop(Timer0_Cfg);
+            timerWrite(Timer0_Cfg, 0);
+            mqtt_client.update();
+            mqtt_client.publish("/mosquitto/portao/alarme", "Alarme ativado");
+        }
+        delay(100);
+    }
 }
 
 void acaoSensores()
@@ -128,7 +195,8 @@ void acaoSensores()
         Serial.println("Aberto");
         hora = ntp.getFormattedTime();
         writeFile("Foi aberto", fileName, hora);
-        // chamar função de abrir portão aqui
+        mqtt_client.update();
+        mqtt_client.publish("/mosquitto/portao/estadoSensores", "Aberto");
     }
     if (sensorMeio.pressed && estadoPortao != MEIO)
     {
@@ -136,7 +204,8 @@ void acaoSensores()
         Serial.println("Meio");
         hora = ntp.getFormattedTime();
         writeFile("Passou pelo meio", fileName, hora);
-        // chamar função de meio de portao aqui
+        mqtt_client.update();
+        mqtt_client.publish("/mosquitto/portao/estadoSensores", "Meio");
     }
     if (sensorFechado.pressed && estadoPortao != FECHADO)
     {
@@ -146,8 +215,8 @@ void acaoSensores()
         Serial.println("Fechado");
         hora = ntp.getFormattedTime();
         writeFile("Fechou", fileName, hora);
-
-        // chamar função de portao fechado aqui
+        mqtt_client.update();
+        mqtt_client.publish("/mosquitto/portao/estadoSensores", "Fechado");
     }
     // se nenhum sersor está pressionado, o portão está em movimento
     if (!sensorAberto.pressed && !sensorMeio.pressed && !sensorFechado.pressed && estadoPortao != MOVIMENTO)
@@ -180,6 +249,57 @@ void connectWiFi()
         Serial.print("Conectado com o IP: ");
         Serial.println(WiFi.localIP());
         digitalWrite(LED, HIGH);
+    }
+}
+
+void connectMQTT()
+{
+    Serial.print("connecting to host...");
+    while (!wifi_client.connect(mqtt_broker, 1883))
+    {
+        Serial.print(".");
+        delay(1000);
+    }
+    Serial.println(" connected!");
+
+    mqtt_client.begin(wifi_client);
+    unsigned long tempoInicial = millis();
+    while (!mqtt_client.connect("Esp32-portao", "mosquitto", "mosquitto"))
+    {
+        Serial.print(".");
+        delay(500);
+    }
+    mqtt_connected = true;
+    Serial.println();
+}
+
+void abrirPortao()
+{
+    Serial.println("Abrindo portão");
+    acaoControle(botaoControleAbrir);
+};
+
+void fecharPortao()
+{
+    acaoControle(botaoControleFechar);
+};
+
+void acaoControle(int botao)
+{
+    digitalWrite(botao, HIGH);
+    delay(500);
+    digitalWrite(botao, LOW);
+};
+
+void tratarComandoMqtt(String comando)
+{
+    if (comando == "abrir")
+    {
+        comandoAbrir = true;
+    }
+    if (comando == "fechar")
+    {
+        comandoFechar = true;
     }
 }
 
@@ -216,17 +336,6 @@ void debounceBotao(Button *button)
         button->lastBounceTime = millis();
     }
 }
-
-void resetTempoAberto()
-{
-    tempoAberto = 0;
-};
-void contarTempoAberto()
-{
-    tempoAberto += (millis() - ultimoClock);
-    ultimoClock = millis();
-    Serial.printf("Contar tempo aberto %d \n", tempoAberto);
-};
 
 /* Funções de interação arquivos ESP */
 
