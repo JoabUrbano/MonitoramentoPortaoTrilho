@@ -2,25 +2,23 @@
 
 <h1 id="usage" > 💻 Descrição </h1>
 
-Projeto que visa monitorar um portão automatico de trilho. É verificado se ele está aberto, fechado ou no meio do caminho. Se o portão fica aberto por muito tempo o usuario é notificado e pode fechalo remotamente.
+Projeto que visa monitorar um portão automatico de trilho com Esp32. É verificado se ele está aberto, fechado ou no meio do caminho. Esses dados são enviados via MQTT e são consultados por um raspberry com o Home Assistent, e então de lá o usuario é notificado via telegram, podendo assim enviar comando para o Esp32 abrir ou fechar o portão, sendo também possivel vizualizar os ultimos logs das interações de abrir/fechar o portão.
 
-Também havera a feature de consultar os ultimos logs dos status do portão, com seu respectivo horario.
-
-Componentes utilizados no projeto:
-- Um Esp32 Dev Module
-- Jumpers
-- Três sensores magneticos de porta
-- Seis resistores de 10K Ohm
-- Um botão
+<h1 id="usage" > 🧰 Componentes utilizados </h1>
+- Um Esp32 Dev Module<br>
+- Jumpers<br>
+- Três sensores magneticos de porta<br>
+- Seis resistores de 10K Ohm<br>
+- Um botão<br>
 - Dois LEDs
 
-Bibliotecas necessarias para Esp32:
-- Wifi
-- WiFiClient
-- PubSubClient
-- NTPClient
-- SPIFFS
-- Fs
+<h1 id="usage" > 📚 Bibliotecas </h1>
+- Wifi<br>
+- WiFiClient<br>
+- PubSubClient<br>
+- NTPClient<br>
+- SPIFFS<br>
+- Fs<br>
 - queue
 
 <h2>Como rodar o projeto?</h2>
