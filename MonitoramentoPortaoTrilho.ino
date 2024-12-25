@@ -5,7 +5,7 @@
 #include <FS.h>
 #include <queue>
 
-#include <PubSubClient.h>
+#include <PubSubClient.h> // https://www.arduinolibraries.info/libraries/pub-sub-client
 
 std::queue<String> filaDeStrings;
 
@@ -118,7 +118,7 @@ void setup()
     pinMode(botaoControleFechar, OUTPUT);
     Serial.begin(115200);
 
-    Timer0_Cfg = timerBegin(0, 80, true);
+    Timer0_Cfg = timerBegin(80);
     timerWrite(Timer0_Cfg, 0);
 
     WiFi.mode(WIFI_STA); //"station mode": permite o ESP32 ser um cliente da rede WiFi
@@ -188,7 +188,7 @@ void loop()
     // Executa ações de acordo com os sinais dos botões.
     acaoSensores();
 
-    uint64_t tempoAberto = timerReadMilis(Timer0_Cfg);
+    uint64_t tempoAberto = timerReadMillis(Timer0_Cfg);
 
     if (tempoAberto > limiteTempoAberto)
     {

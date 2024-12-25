@@ -1,8 +1,8 @@
-# MonitoramentoPortaoTrilho
+# Monitoramento Portao de Trilho Elétrico
 
 <h1 id="usage" > 💻 Descrição </h1>
 
-Projeto que visa monitorar um portão automatico de trilho com Esp32. É verificado se ele está aberto, fechado ou no meio do caminho. Esses dados são enviados via MQTT e são consultados por um raspberry com o Home Assistent, e então de lá o usuario é notificado via telegram, podendo assim enviar comando para o Esp32 abrir ou fechar o portão, sendo também possivel vizualizar os ultimos logs das interações de abrir/fechar o portão.
+Projeto que visa monitorar um portão elétrico de trilho com Esp32. É verificado se ele está aberto totalmente, fechado ou se ele está aberto parcialmente. Esses dados são enviados via MQTT e são consultados por um raspberry com o Home Assistent, e então de lá o usuario é notificado via telegram, podendo assim enviar um comando via chat para o Esp32 conectado a um ontrole para abrir ou fechar o portão, sendo também possivel vizualizar os ultimos logs das interações de abrir/fechar o portão.
 
 <h1 id="usage" > 🧰 Componentes utilizados </h1>
 - Um Esp32 Dev Module<br>
