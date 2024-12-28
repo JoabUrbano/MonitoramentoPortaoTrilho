@@ -31,13 +31,14 @@ enum EstadoPortao estadoPortao;
 #define LED 2
 #define LEDFormat 14
 #define Format 12
+#define wifi_ssid "NPITI-IoT"
+#define wifi_password "NPITI-IoT"
+#define botaoControleAbrir 23
+#define botaoControleFechar 22
 
 Button sensorAberto = {4, false, LOW, LOW, 0};
 Button sensorMeio = {18, false, LOW, LOW, 0};
 Button sensorFechado = {19, false, LOW, LOW, 0};
-
-#define wifi_ssid "NPITI-IoT"
-#define wifi_password "NPITI-IoT"
 
 int wifi_timeout = 100000;
 
@@ -47,6 +48,10 @@ PubSubClient client(wifi_client);
 const char *mqtt_broker = "homeassistant.local";
 const int mqtt_port = 1883;
 int mqtt_timeout = 10000;
+
+bool comandoAbrir = false;
+bool comandoFechar = false;
+bool mqtt_connected = false;
 
 /* Variaveis de arquivo */
 String path, state;
@@ -60,9 +65,6 @@ String hora;
 void connectWiFi();
 void connectMQTT();
 
-bool mqtt_connected = false;
-
-/* Definição Funções de Interação com arquivos */
 void writeFile(String state, String path, String hora);
 void readFile(String path);
 void formatFile();
@@ -83,19 +85,12 @@ hw_timer_t *Timer0_Cfg = NULL;
 
 void acaoSensores();
 
-bool comandoAbrir = false;
-bool comandoFechar = false;
-
-#define botaoControleAbrir 23
-#define botaoControleFechar 22
-
 void abrirPortao();
 void fecharPortao();
 void acaoControle(int botao);
 
 void tratarComandoMqtt(String comando);
 void callback(char *topic, byte *message, unsigned int length);
-
 void reconnect();
 
 // criar uma task para executar as acoes do portao em outro core
@@ -110,7 +105,6 @@ void setup()
     attachInterrupt(sensorMeio.PIN, interrupcaoMeio, CHANGE);
     attachInterrupt(sensorFechado.PIN, interrupcaoFechado, CHANGE);
 
-    pinMode(LED, OUTPUT);
     pinMode(LED, OUTPUT);
     pinMode(LEDFormat, OUTPUT);
     pinMode(Format, INPUT);
@@ -149,7 +143,7 @@ void setup()
 
 void Task1Code(void *parameter)
 {
-    for (;;)
+    while (1)
     {
 
         if (comandoAbrir)
@@ -236,7 +230,6 @@ void acaoSensores()
     }
 };
 
-// Função para conectar o Esp ao Wifi
 void connectWiFi()
 {
     Serial.print("Conectando à rede WiFi .. ");

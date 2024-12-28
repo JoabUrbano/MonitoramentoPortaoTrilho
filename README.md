@@ -8,15 +8,16 @@ Projeto que visa monitorar um portão elétrico de trilho com Esp32. É verifica
 - Um Esp32 Dev Module<br>
 - Jumpers<br>
 - Três sensores magneticos de porta<br>
-- Seis resistores de 10K Ohm<br>
+- Sete resistores de 10K Ohm<br>
 - Um botão<br>
-- Dois LEDs
+- Um controle de portão sintonizadocom seu motor<br>
+- Dois LEDs (Nó código utilizamos o pino 2 para o LED do Wifi, que é o o pino conectado com o LED interno, por isso se não quiser utilizar um LED dedicado precisará apenas de um LELD para indicar a formatação)
 
 <h1 id="usage" > 📚 Bibliotecas </h1>
 - Wifi<br>
 - WiFiClient<br>
-- PubSubClient<br>
-- NTPClient<br>
+- <a href="https://www.arduinolibraries.info/libraries/pub-sub-client">PubSubClient</a><br>
+- <a href="https://github.com/arduino-libraries/NTPClient">NTPClient</a><br>
 - SPIFFS<br>
 - Fs<br>
 - queue
@@ -25,6 +26,19 @@ Projeto que visa monitorar um portão elétrico de trilho com Esp32. É verifica
 
 É necessario que a IDE do arduino e as bibliotecas necessarias estejam instalados na maquina. Após instalar tudo, você deve escolher o modelo do seu Esp32 e a porta para fazer a gravação.
 
+<h2>Como rodar o projeto?</h2>
+
+É necessario que a IDE do arduino e as bibliotecas necessarias estejam instalados na maquina. Após instalar tudo, você deve escolher o modelo do seu Esp32 e a porta para fazer a gravação.
+
+<h2>Montagem</h2>
+
+Os pinos 4, 18 e 19 são os pinos bara os sensores em ordem da direção do motor do portão para a tranca do portão. O 4 é para o sensor totalmente aberto, o 18 para o no meio do percurso e o 19 para o sensor onde fica a tranca indicando que o portão está fechado.
+
+Há um botão para formatar os arquivos internos de Esp, incluindo os Logs, mas esse botão é opcional caso você não queira essa opção, exxcluindo tambem o LED que indica que o Esp está formatando.
+
+O segundo LED é para indicar a conexão com o Wifi.
+
+Finalmente os pinos 22 e 23 são pinos que estarão conectados diretamente no circuito de um controle sintonizado com o motor do portão. Dessa forma dará para fazer o controle do portão remotamente via Telegram.
 
 <h3>Autores</h3>
 <a href="https://github.com/JoabUrbano">Joab Urbano</a><br>
