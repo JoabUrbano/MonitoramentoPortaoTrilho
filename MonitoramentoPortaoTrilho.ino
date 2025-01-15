@@ -1,11 +1,11 @@
 #include <WiFi.h>
 #include <WiFiClient.h>
-#include <NTPClient.h> // https://github.com/arduino-libraries/NTPClient
+#include <NTPClient.h>
 #include "SPIFFS.h"
 #include <FS.h>
 #include <queue>
 
-#include <PubSubClient.h> // https://www.arduinolibraries.info/libraries/pub-sub-client
+#include <PubSubClient.h>
 
 std::queue<String> filaDeStrings;
 
@@ -31,8 +31,8 @@ enum EstadoPortao estadoPortao;
 #define LED 2
 #define LEDFormat 14
 #define Format 12
-#define wifi_ssid "NPITI-IoT"
-#define wifi_password "NPITI-IoT"
+#define wifi_ssid "Wokwi-GUEST"
+#define wifi_password ""
 #define botaoControleAbrir 23
 #define botaoControleFechar 22
 
@@ -59,141 +59,15 @@ String fileName = "/statusLogs.txt";
 int maxLines = 10;
 
 WiFiUDP udp;
-NTPClient ntp(udp, "a.st1.ntp.br", -3 * 3600, 60000); // Cria um objeto "NTP" com as configurações.utilizada no Brasil
+NTPClient ntp(udp, "a.st1.ntp.br", -3 * 3600, 60000); // Cria um objeto "NTP" com as configurações utilizada no Brasil
 String hora;
 
-void connectWiFi();
-void connectMQTT();
-
-void writeFile(String state, String path, String hora);
-void readFile(String path);
-void formatFile();
-void openFS();
-
-// Funções de interrupção dos sensores
-void IRAM_ATTR interrupcaoFechado();
-void IRAM_ATTR interrupcaoMeio();
-void IRAM_ATTR interrupcaoAberto();
-void debounceBotao(Button *button); // função de debounce
 unsigned long int debounceDelay = 50;
-
-// a partir do momento que o portão é aberto, o tempo é contado
-// quando o portão for fechado, o tempo é resetado
 
 unsigned long int limiteTempoAberto = 60000; // 60 segundos
 hw_timer_t *Timer0_Cfg = NULL;
 
-void acaoSensores();
-
-void abrirPortao();
-void fecharPortao();
-void acaoControle(int botao);
-
-void tratarComandoMqtt(String comando);
-void callback(char *topic, byte *message, unsigned int length);
-void reconnect();
-
-// criar uma task para executar as acoes do portao em outro core
-TaskHandle_t Core0;
-
-void setup()
-{
-    pinMode(sensorAberto.PIN, INPUT);
-    pinMode(sensorMeio.PIN, INPUT);
-    pinMode(sensorFechado.PIN, INPUT);
-    attachInterrupt(sensorAberto.PIN, interrupcaoAberto, CHANGE);
-    attachInterrupt(sensorMeio.PIN, interrupcaoMeio, CHANGE);
-    attachInterrupt(sensorFechado.PIN, interrupcaoFechado, CHANGE);
-
-    pinMode(LED, OUTPUT);
-    pinMode(LEDFormat, OUTPUT);
-    pinMode(Format, INPUT);
-    pinMode(botaoControleAbrir, OUTPUT);
-    pinMode(botaoControleFechar, OUTPUT);
-    Serial.begin(115200);
-
-    Timer0_Cfg = timerBegin(80);
-    timerWrite(Timer0_Cfg, 0);
-
-    WiFi.mode(WIFI_STA); //"station mode": permite o ESP32 ser um cliente da rede WiFi
-    WiFi.begin(wifi_ssid, wifi_password);
-    connectWiFi();
-
-    ntp.begin();       // Inicia o protocolo
-    ntp.forceUpdate(); // Atualização
-
-    estadoPortao = FECHADO;
-
-    client.setServer(mqtt_broker, mqtt_port);
-    client.setCallback(callback);
-
-    xTaskCreatePinnedToCore(
-        Task1Code,
-        "Task1",
-        10000,
-        NULL,
-        1,
-        &Core0,
-        0);
-
-    delay(500);
-
-    openFS();
-}
-
-void Task1Code(void *parameter)
-{
-    while (1)
-    {
-
-        if (comandoAbrir)
-        {
-            abrirPortao();
-            comandoAbrir = false;
-        }
-        if (comandoFechar)
-        {
-            fecharPortao();
-            comandoFechar = false;
-        }
-        delay(100);
-    }
-}
-
-void loop()
-{
-    /* Verifica o botão de formatação */
-    int val = digitalRead(Format);
-    if (val == HIGH)
-    {
-        digitalWrite(LEDFormat, HIGH);
-        Serial.println("Formatando Esp32");
-        formatFile();
-        digitalWrite(LEDFormat, LOW);
-        delay(1000);
-    }
-
-    if (!client.connected())
-    {                // Se MQTT não estiver conectado
-        reconnect(); // Tente se conectar ao broker
-    }
-    client.loop();
-
-    // Executa ações de acordo com os sinais dos botões.
-    acaoSensores();
-
-    uint64_t tempoAberto = timerReadMillis(Timer0_Cfg);
-
-    if (tempoAberto > limiteTempoAberto)
-    {
-        Serial.println("Portão aberto por mais de 60 segundos");
-        timerStop(Timer0_Cfg);
-        timerWrite(Timer0_Cfg, 0);
-        client.publish("/mosquitto/portao/alarme", "Alarme ativado");
-    }
-    delay(100);
-}
-
+//-----------------------------------------------------------------------------------
 void acaoSensores()
 {
     if (sensorAberto.pressed && estadoPortao != ABERTO)
@@ -229,31 +103,6 @@ void acaoSensores()
         timerStart(Timer0_Cfg);
     }
 };
-
-void connectWiFi()
-{
-    Serial.print("Conectando à rede WiFi .. ");
-
-    unsigned long tempoInicial = millis();
-    while (WiFi.status() != WL_CONNECTED && (millis() - tempoInicial < wifi_timeout))
-    {
-        Serial.print(".");
-        delay(100);
-    }
-    Serial.println();
-
-    if (WiFi.status() != WL_CONNECTED)
-    {
-        Serial.println("Conexão com WiFi falhou!");
-        digitalWrite(LED, LOW);
-    }
-    else
-    {
-        Serial.print("Conectado com o IP: ");
-        Serial.println(WiFi.localIP());
-        digitalWrite(LED, HIGH);
-    }
-}
 
 void abrirPortao()
 {
@@ -312,7 +161,6 @@ void reconnect()
     while (!client.connected())
     {
         Serial.print("Attempting MQTT connection...");
-        // Attempt to connect
         if (client.connect("ESP32Client", "mosquitto", "mosquitto"))
         {
             Serial.println("connected");
@@ -326,6 +174,32 @@ void reconnect()
             Serial.println(" try again in 0.5 seconds");
             delay(500);
         }
+    }
+}
+
+
+void connectWiFi()
+{
+    Serial.print("Conectando à rede WiFi .. ");
+
+    unsigned long tempoInicial = millis();
+    while (WiFi.status() != WL_CONNECTED && (millis() - tempoInicial < wifi_timeout))
+    {
+        Serial.print(".");
+        delay(100);
+    }
+    Serial.println();
+
+    if (WiFi.status() != WL_CONNECTED)
+    {
+        Serial.println("Conexão com WiFi falhou!");
+        digitalWrite(LED, LOW);
+    }
+    else
+    {
+        Serial.print("Conectado com o IP: ");
+        Serial.println(WiFi.localIP());
+        digitalWrite(LED, HIGH);
     }
 }
 
@@ -363,7 +237,33 @@ void debounceBotao(Button *button)
     }
 }
 
-/* Funções de interação arquivos ESP */
+void ControleRemotoPortao(void *parameter)
+{
+    while (1)
+    {
+
+        if (comandoAbrir)
+        {
+            abrirPortao();
+            comandoAbrir = false;
+        }
+        if (comandoFechar)
+        {
+            fecharPortao();
+            comandoFechar = false;
+        }
+        delay(100);
+    }
+}
+
+//.................................................................
+void openFS(void)
+{
+    if (!SPIFFS.begin())
+        Serial.println("\nErro ao abrir o sistema de arquivos");
+    else
+        Serial.println("\nSistema de arquivos aberto com sucesso!");
+}
 
 void writeFile(String state, String path, String hora)
 {
@@ -398,27 +298,20 @@ void writeFile(String state, String path, String hora)
 
 void readFile(String path)
 {
-    Serial.println("Read file");
-
-    File rFile = SPIFFS.open(path, "r"); // r+ leitura e escrita
+    File rFile = SPIFFS.open(path, "r");
 
     if (!rFile)
     {
-        Serial.println("Erro ao abrir arquivo!");
-
+        Serial.println("Erro ao tentar acessar os logs!");
         return;
     }
 
     else
     {
-        Serial.print("---------- Lendo arquivo ");
-
-        Serial.print(path);
-
-        Serial.println("  ---------");
+        Serial.println("---------- Logs  ---------");
         while (rFile.position() < rFile.size())
         {
-            String line = rFile.readStringUntil('\n'); // Lê uma linha do arquivo
+            String line = rFile.readStringUntil('\n');
             Serial.println(line);
             filaDeStrings.push(line);
         }
@@ -430,13 +323,86 @@ void readFile(String path)
 void formatFile()
 {
     SPIFFS.format();
-    Serial.println("Formatou SPIFFS");
+    Serial.println("Formatação concluida!");
 }
 
-void openFS(void)
+// criar uma task para executar as acoes do portao em outro core
+TaskHandle_t controlePortao;
+TaskHandle_t format;
+
+void setup()
 {
-    if (!SPIFFS.begin())
-        Serial.println("\nErro ao abrir o sistema de arquivos");
-    else
-        Serial.println("\nSistema de arquivos aberto com sucesso!");
+    pinMode(sensorAberto.PIN, INPUT);
+    pinMode(sensorMeio.PIN, INPUT);
+    pinMode(sensorFechado.PIN, INPUT);
+    attachInterrupt(sensorAberto.PIN, interrupcaoAberto, CHANGE);
+    attachInterrupt(sensorMeio.PIN, interrupcaoMeio, CHANGE);
+    attachInterrupt(sensorFechado.PIN, interrupcaoFechado, CHANGE);
+
+    pinMode(LED, OUTPUT);
+    pinMode(LEDFormat, OUTPUT);
+    pinMode(Format, INPUT);
+    pinMode(botaoControleAbrir, OUTPUT);
+    pinMode(botaoControleFechar, OUTPUT);
+    Serial.begin(115200);
+
+    Timer0_Cfg = timerBegin(80);
+    timerWrite(Timer0_Cfg, 0);
+
+    WiFi.mode(WIFI_STA); //"station mode": permite o ESP32 ser um cliente da rede WiFi
+    WiFi.begin(wifi_ssid, wifi_password);
+    connectWiFi();
+
+    ntp.begin();
+    ntp.forceUpdate();
+
+    estadoPortao = FECHADO;
+
+    client.setServer(mqtt_broker, mqtt_port);
+    client.setCallback(callback);
+
+    xTaskCreatePinnedToCore(
+        ControleRemotoPortao,
+        "Task1",
+        10000,
+        NULL,
+        1,
+        &controlePortao,
+        0);
+
+    delay(500);
+
+    openFS();
+}
+
+void loop()
+{
+    int format = digitalRead(Format);
+    if (format == HIGH)
+    {
+        digitalWrite(LEDFormat, HIGH);
+        Serial.println("Formatando arquivos do esp");
+        formatFile();
+        digitalWrite(LEDFormat, LOW);
+        delay(1000);
+    }
+
+    if (!client.connected())
+    {                // Se MQTT não estiver conectado tenta reconectar
+        reconnect();
+    }
+    client.loop();
+
+    acaoSensores();
+
+    uint64_t tempoAberto = timerReadMillis(Timer0_Cfg);
+
+    if (tempoAberto > limiteTempoAberto)
+    {
+        Serial.println("Portão aberto por mais de 60 segundos");
+        timerStop(Timer0_Cfg);
+        timerWrite(Timer0_Cfg, 0);
+        client.publish("/mosquitto/portao/alarme", "Alarme ativado");
+    }
+    delay(100);
 }
