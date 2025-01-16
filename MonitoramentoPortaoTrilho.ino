@@ -43,8 +43,8 @@ int wifi_timeout = 10000;
 WiFiClient wifi_client;
 PubSubClient client(wifi_client);
 
-const char *mqtt_broker = "homeassistant.local";
-const int mqtt_port = 1883;
+const char *mqtt_broker = "YourBroker";
+const int mqtt_port = 8883;
 
 bool comandoAbrir = false;
 bool comandoFechar = false;
@@ -355,7 +355,7 @@ void setup()
     xTaskCreatePinnedToCore(
         ControleRemotoPortao,
         "Task1",
-        10000,
+        2048,
         NULL,
         1,
         &controlePortao,
