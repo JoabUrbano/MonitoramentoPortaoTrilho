@@ -29,8 +29,6 @@ enum EstadoPortao
 enum EstadoPortao estadoPortao;
 
 #define LED 2
-#define LEDFormat 14
-#define Format 12
 #define wifi_ssid "Wokwi-GUEST"
 #define wifi_password ""
 #define botaoControleAbrir 23
@@ -234,24 +232,6 @@ void debounceBotao(Button *button)
     }
 }
 
-void ControleRemotoPortao(void *parameter)
-{
-    while (1)
-    {
-        if (comandoAbrir)
-        {
-            abrirPortao();
-            comandoAbrir = false;
-        }
-        if (comandoFechar)
-        {
-            fecharPortao();
-            comandoFechar = false;
-        }
-        delay(100);
-    }
-}
-
 //.................................................................
 void openFS(void)
 {
@@ -322,7 +302,26 @@ void formatFile()
     Serial.println("Formatação concluida!");
 }
 
+// -------- Tasks --------
 TaskHandle_t controlePortao;
+
+void ControleRemotoPortao(void *parameter)
+{
+    while (1)
+    {
+        if (comandoAbrir)
+        {
+            abrirPortao();
+            comandoAbrir = false;
+        }
+        if (comandoFechar)
+        {
+            fecharPortao();
+            comandoFechar = false;
+        }
+        vTaskDelay(pdMS_TO_TICKS(200));
+    }
+}
 
 void setup()
 {
@@ -334,8 +333,6 @@ void setup()
     attachInterrupt(sensorFechado.PIN, interrupcaoFechado, CHANGE);
 
     pinMode(LED, OUTPUT);
-    pinMode(LEDFormat, OUTPUT);
-    pinMode(Format, INPUT);
     pinMode(botaoControleAbrir, OUTPUT);
     pinMode(botaoControleFechar, OUTPUT);
     Serial.begin(115200);
@@ -367,20 +364,11 @@ void setup()
     delay(500);
 
     openFS();
+    formatFile();
 }
 
 void loop()
 {
-    int format = digitalRead(Format);
-    if (format == HIGH)
-    {
-        digitalWrite(LEDFormat, HIGH);
-        Serial.println("Formatando arquivos do esp");
-        formatFile();
-        digitalWrite(LEDFormat, LOW);
-        delay(1000);
-    }
-
     if (!client.connected())
     {                // Se MQTT não estiver conectado tenta reconectar
         reconnect();
