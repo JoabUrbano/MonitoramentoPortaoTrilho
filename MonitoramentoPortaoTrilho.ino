@@ -40,14 +40,13 @@ Button sensorAberto = {4, false, LOW, LOW, 0};
 Button sensorMeio = {18, false, LOW, LOW, 0};
 Button sensorFechado = {19, false, LOW, LOW, 0};
 
-int wifi_timeout = 100000;
+int wifi_timeout = 10000;
 
 WiFiClient wifi_client;
 PubSubClient client(wifi_client);
 
 const char *mqtt_broker = "homeassistant.local";
 const int mqtt_port = 1883;
-int mqtt_timeout = 10000;
 
 bool comandoAbrir = false;
 bool comandoFechar = false;
@@ -68,6 +67,72 @@ unsigned long int limiteTempoAberto = 60000; // 60 segundos
 hw_timer_t *Timer0_Cfg = NULL;
 
 //-----------------------------------------------------------------------------------
+void connectWiFi()
+{
+    Serial.print("Conectando à rede WiFi .. ");
+
+    unsigned long tempoInicial = millis();
+    while (WiFi.status() != WL_CONNECTED && (millis() - tempoInicial < wifi_timeout))
+    {
+        Serial.print(".");
+        delay(100);
+    }
+    Serial.println();
+
+    if (WiFi.status() != WL_CONNECTED)
+    {
+        Serial.println("Conexão com WiFi falhou!");
+        digitalWrite(LED, LOW);
+    }
+    else
+    {
+        Serial.print("Conectado com o IP: ");
+        Serial.println(WiFi.localIP());
+        digitalWrite(LED, HIGH);
+    }
+}
+
+void reconnect()
+{
+    while (!client.connected())
+    {
+        Serial.print("Attempting MQTT connection...");
+        if (client.connect("ESP32Client", "mosquitto", "mosquitto"))
+        {
+            Serial.println("connected");
+            // Subscribe
+            client.subscribe("/mosquitto/portao/comandos");
+        }
+        else
+        {
+            Serial.print("failed, rc=");
+            Serial.print(client.state());
+            Serial.println(" try again in 0.5 seconds");
+            delay(500);
+        }
+    }
+}
+
+void callback(char *topic, byte *message, unsigned int length)
+{
+    Serial.print("Mensagem Recebida no topic: ");
+    Serial.print(topic);
+    Serial.print(". Mensagem: ");
+    String messageTemp;
+
+    for (int i = 0; i < length; i++)
+    {
+        Serial.print((char)message[i]);
+        messageTemp += (char)message[i];
+    }
+    Serial.println();
+
+    if (String(topic) == "/mosquitto/portao/comandos")
+    {
+        tratarComandoMqtt(messageTemp);
+    }
+}
+
 void acaoSensores()
 {
     if (sensorAberto.pressed && estadoPortao != ABERTO)
@@ -136,74 +201,6 @@ void tratarComandoMqtt(String comando)
     }
 }
 
-void callback(char *topic, byte *message, unsigned int length)
-{
-    Serial.print("Mensagem Recebida no topic: ");
-    Serial.print(topic);
-    Serial.print(". Mensagem: ");
-    String messageTemp;
-
-    for (int i = 0; i < length; i++)
-    {
-        Serial.print((char)message[i]);
-        messageTemp += (char)message[i];
-    }
-    Serial.println();
-
-    if (String(topic) == "/mosquitto/portao/comandos")
-    {
-        tratarComandoMqtt(messageTemp);
-    }
-}
-
-void reconnect()
-{
-    while (!client.connected())
-    {
-        Serial.print("Attempting MQTT connection...");
-        if (client.connect("ESP32Client", "mosquitto", "mosquitto"))
-        {
-            Serial.println("connected");
-            // Subscribe
-            client.subscribe("/mosquitto/portao/comandos");
-        }
-        else
-        {
-            Serial.print("failed, rc=");
-            Serial.print(client.state());
-            Serial.println(" try again in 0.5 seconds");
-            delay(500);
-        }
-    }
-}
-
-
-void connectWiFi()
-{
-    Serial.print("Conectando à rede WiFi .. ");
-
-    unsigned long tempoInicial = millis();
-    while (WiFi.status() != WL_CONNECTED && (millis() - tempoInicial < wifi_timeout))
-    {
-        Serial.print(".");
-        delay(100);
-    }
-    Serial.println();
-
-    if (WiFi.status() != WL_CONNECTED)
-    {
-        Serial.println("Conexão com WiFi falhou!");
-        digitalWrite(LED, LOW);
-    }
-    else
-    {
-        Serial.print("Conectado com o IP: ");
-        Serial.println(WiFi.localIP());
-        digitalWrite(LED, HIGH);
-    }
-}
-
-// Declaração das funçoẽs de interrupção
 void IRAM_ATTR interrupcaoFechado()
 {
     debounceBotao(&sensorFechado);
@@ -241,7 +238,6 @@ void ControleRemotoPortao(void *parameter)
 {
     while (1)
     {
-
         if (comandoAbrir)
         {
             abrirPortao();
@@ -326,9 +322,7 @@ void formatFile()
     Serial.println("Formatação concluida!");
 }
 
-// criar uma task para executar as acoes do portao em outro core
 TaskHandle_t controlePortao;
-TaskHandle_t format;
 
 void setup()
 {
