@@ -28,7 +28,7 @@ enum EstadoPortao
 
 enum EstadoPortao estadoPortao;
 
-#define LED 2
+#define LEDWifi 2
 #define wifi_ssid "Wokwi-GUEST"
 #define wifi_password ""
 #define botaoControleAbrir 23
@@ -80,13 +80,13 @@ void connectWiFi()
     if (WiFi.status() != WL_CONNECTED)
     {
         Serial.println("Conexão com WiFi falhou!");
-        digitalWrite(LED, LOW);
+        digitalWrite(LEDWifi, LOW);
     }
     else
     {
         Serial.print("Conectado com o IP: ");
         Serial.println(WiFi.localIP());
-        digitalWrite(LED, HIGH);
+        digitalWrite(LEDWifi, HIGH);
     }
 }
 
@@ -94,18 +94,18 @@ void reconnect()
 {
     while (!client.connected())
     {
-        Serial.print("Attempting MQTT connection...");
+        Serial.print("Tentando conexão MQTT...");
         if (client.connect("ESP32Client", "mosquitto", "mosquitto"))
         {
-            Serial.println("connected");
+            Serial.println("Conectado");
             // Subscribe
             client.subscribe("/mosquitto/portao/comandos");
         }
         else
         {
-            Serial.print("failed, rc=");
+            Serial.print("falhou, rc=");
             Serial.print(client.state());
-            Serial.println(" try again in 0.5 seconds");
+            Serial.println(" tente novamente em 0.5 segundos");
             delay(500);
         }
     }
@@ -332,10 +332,13 @@ void setup()
     attachInterrupt(sensorMeio.PIN, interrupcaoMeio, CHANGE);
     attachInterrupt(sensorFechado.PIN, interrupcaoFechado, CHANGE);
 
-    pinMode(LED, OUTPUT);
+    pinMode(LEDWifi, OUTPUT);
     pinMode(botaoControleAbrir, OUTPUT);
     pinMode(botaoControleFechar, OUTPUT);
     Serial.begin(115200);
+
+    openFS();
+    //formatFile();
 
     Timer0_Cfg = timerBegin(80);
     timerWrite(Timer0_Cfg, 0);
@@ -361,10 +364,7 @@ void setup()
         &controlePortao,
         0);
 
-    delay(500);
-
-    openFS();
-    formatFile();
+    delay(100);
 }
 
 void loop()
