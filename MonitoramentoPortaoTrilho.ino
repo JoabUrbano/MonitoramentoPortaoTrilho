@@ -305,6 +305,7 @@ void formatFile()
 // -------- Tasks --------
 TaskHandle_t controlePortao;
 TaskHandle_t reconectMqttHendle;
+TaskHandle_t publicarConsultarMqttHendle;
 
 void ControleRemotoPortao(void *parameter)
 {
@@ -345,6 +346,22 @@ void reconectMqtt(void *paramter){
     }
     client.loop();
     vTaskDelay(pdMS_TO_TICKS(1000));
+  }
+}
+
+void publicarConsultarMqtt(void *paramter) {
+  while(1) {
+    acaoSensores();
+    uint64_t tempoAberto = timerReadMillis(Timer0_Cfg);
+
+    if (tempoAberto > limiteTempoAberto)
+    {
+        Serial.println("Portão aberto por mais de 60 segundos");
+        timerStop(Timer0_Cfg);
+        timerWrite(Timer0_Cfg, 0);
+        client.publish("/mosquitto/portao/alarme", "Alarme ativado");
+    }
+    vTaskDelay(pdMS_TO_TICKS(200));
   }
 }
 
@@ -392,27 +409,25 @@ void setup()
     xTaskCreatePinnedToCore(
         reconectMqtt,
         "Task reconect MQTT",
-        2048,
+        4096,
         NULL,
         1,
         &reconectMqttHendle,
         0);
+        
+    xTaskCreatePinnedToCore(
+        publicarConsultarMqtt,
+        "Task publicar e consultar MQTT",
+        4096,
+        NULL,
+        1,
+        &publicarConsultarMqttHendle,
+        1);
 
     delay(100);
 }
 
 void loop()
 {
-    acaoSensores();
-
-    uint64_t tempoAberto = timerReadMillis(Timer0_Cfg);
-
-    if (tempoAberto > limiteTempoAberto)
-    {
-        Serial.println("Portão aberto por mais de 60 segundos");
-        timerStop(Timer0_Cfg);
-        timerWrite(Timer0_Cfg, 0);
-        client.publish("/mosquitto/portao/alarme", "Alarme ativado");
-    }
-    delay(100);
+    delay(50);
 }
