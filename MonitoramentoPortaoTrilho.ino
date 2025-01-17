@@ -304,6 +304,7 @@ void formatFile()
 
 // -------- Tasks --------
 TaskHandle_t controlePortao;
+TaskHandle_t reconectMqttHendle;
 
 void ControleRemotoPortao(void *parameter)
 {
@@ -321,6 +322,30 @@ void ControleRemotoPortao(void *parameter)
         }
         vTaskDelay(pdMS_TO_TICKS(200));
     }
+}
+
+void reconectMqtt(void *paramter){
+  if (client.connected())
+    {
+      vTaskSuspend(NULL);
+    }
+  while(1) {
+    if (!client.connected())
+    {                // Se MQTT não estiver conectado tenta reconectar
+        reconnect();
+        if (client.connected())
+        {
+          Serial.println("Reconexão MQTT bem-sucedida!");
+          vTaskSuspend(NULL); // Suspende a tarefa atual (reconectMqtt)
+        }
+        else
+        {
+          Serial.println("Falha ao reconectar ao MQTT. Tentando novamente...");
+        }
+    }
+    client.loop();
+    vTaskDelay(pdMS_TO_TICKS(1000));
+  }
 }
 
 void setup()
@@ -357,11 +382,20 @@ void setup()
 
     xTaskCreatePinnedToCore(
         ControleRemotoPortao,
-        "Task1",
+        "Task controle remoto",
         2048,
         NULL,
         1,
         &controlePortao,
+        0);
+    
+    xTaskCreatePinnedToCore(
+        reconectMqtt,
+        "Task reconect MQTT",
+        2048,
+        NULL,
+        1,
+        &reconectMqttHendle,
         0);
 
     delay(100);
@@ -369,12 +403,6 @@ void setup()
 
 void loop()
 {
-    if (!client.connected())
-    {                // Se MQTT não estiver conectado tenta reconectar
-        reconnect();
-    }
-    client.loop();
-
     acaoSensores();
 
     uint64_t tempoAberto = timerReadMillis(Timer0_Cfg);
