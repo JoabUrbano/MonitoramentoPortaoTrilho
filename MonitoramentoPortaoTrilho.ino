@@ -105,8 +105,8 @@ void reconnect()
         {
             Serial.print("falhou, rc=");
             Serial.print(client.state());
-            Serial.println(" tente novamente em 0.5 segundos");
-            delay(500);
+            Serial.println(" tente novamente em 2 segundos");
+            delay(2000);
         }
     }
 }
@@ -291,6 +291,7 @@ void readFile(String path)
             Serial.println(line);
             filaDeStrings.push(line);
         }
+        Serial.println("---------- End  ---------");
 
         rFile.close();
     }
@@ -379,8 +380,8 @@ void setup()
     pinMode(botaoControleFechar, OUTPUT);
     Serial.begin(115200);
 
+    formatFile();
     openFS();
-    //formatFile();
 
     Timer0_Cfg = timerBegin(80);
     timerWrite(Timer0_Cfg, 0);
@@ -396,15 +397,6 @@ void setup()
 
     client.setServer(mqtt_broker, mqtt_port);
     client.setCallback(callback);
-
-    xTaskCreatePinnedToCore(
-        ControleRemotoPortao,
-        "Task controle remoto",
-        2048,
-        NULL,
-        1,
-        &controlePortao,
-        0);
     
     xTaskCreatePinnedToCore(
         reconectMqtt,
@@ -414,6 +406,15 @@ void setup()
         1,
         &reconectMqttHendle,
         0);
+
+      xTaskCreatePinnedToCore(
+        ControleRemotoPortao,
+        "Task controle remoto",
+        2048,
+        NULL,
+        1,
+        &controlePortao,
+        1);
         
     xTaskCreatePinnedToCore(
         publicarConsultarMqtt,
@@ -424,7 +425,7 @@ void setup()
         &publicarConsultarMqttHendle,
         1);
 
-    delay(100);
+    delay(50);
 }
 
 void loop()
