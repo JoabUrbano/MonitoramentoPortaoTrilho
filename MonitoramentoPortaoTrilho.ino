@@ -29,14 +29,14 @@ enum EstadoPortao
 enum EstadoPortao estadoPortao;
 
 #define LEDWifi 2
-#define wifi_ssid "Wokwi-GUEST"
-#define wifi_password ""
+#define wifi_ssid "brisa-1404984"
+#define wifi_password "uihbywuq"
 #define botaoControleAbrir 23
 #define botaoControleFechar 22
 
-Button sensorAberto = {4, false, LOW, LOW, 0};
+Button sensorAberto = {12, false, LOW, LOW, 0};
 Button sensorMeio = {18, false, LOW, LOW, 0};
-Button sensorFechado = {19, false, LOW, LOW, 0};
+Button sensorFechado = {21, false, LOW, LOW, 0};
 
 int wifi_timeout = 10000;
 
@@ -59,7 +59,7 @@ WiFiUDP udp;
 NTPClient ntp(udp, "a.st1.ntp.br", -3 * 3600, 60000); // Cria um objeto "NTP" com as configurações utilizada no Brasil
 String hora;
 
-unsigned long int debounceDelay = 50;
+unsigned long int debounceDelay = 100;
 
 unsigned long int limiteTempoAberto = 60000; // 60 segundos
 hw_timer_t *Timer0_Cfg = NULL;
@@ -92,7 +92,7 @@ void connectWiFi()
 
 void reconnect()
 {
-    while (!client.connected())
+    if (!client.connected())
     {
         Serial.print("Tentando conexão MQTT...");
         if (client.connect("ESP32Client", "mosquitto", "mosquitto"))
@@ -131,42 +131,6 @@ void callback(char *topic, byte *message, unsigned int length)
     }
 }
 
-void acaoSensores()
-{
-    if (sensorAberto.pressed && estadoPortao != ABERTO)
-    {
-        estadoPortao = ABERTO;
-        Serial.println("Aberto");
-        hora = ntp.getFormattedTime();
-        writeFile("Foi aberto", fileName, hora);
-        client.publish("/mosquitto/portao/estadoSensores", "Aberto");
-    }
-    if (sensorMeio.pressed && estadoPortao != MEIO)
-    {
-        estadoPortao = MEIO;
-        Serial.println("Meio");
-        hora = ntp.getFormattedTime();
-        writeFile("Passou pelo meio", fileName, hora);
-        client.publish("/mosquitto/portao/estadoSensores", "Meio");
-    }
-    if (sensorFechado.pressed && estadoPortao != FECHADO)
-    {
-        estadoPortao = FECHADO;
-        timerStop(Timer0_Cfg);
-        timerWrite(Timer0_Cfg, 0);
-        Serial.println("Fechado");
-        hora = ntp.getFormattedTime();
-        writeFile("Fechou", fileName, hora);
-        client.publish("/mosquitto/portao/estadoSensores", "Fechado");
-    }
-    // se nenhum sersor está pressionado, o portão está em movimento
-    if (!sensorAberto.pressed && !sensorMeio.pressed && !sensorFechado.pressed && estadoPortao != MOVIMENTO)
-    {
-        estadoPortao = MOVIMENTO;
-        timerStart(Timer0_Cfg);
-    }
-};
-
 void abrirPortao()
 {
     Serial.println("Abrindo portão");
@@ -202,14 +166,20 @@ void tratarComandoMqtt(String comando)
 void IRAM_ATTR interrupcaoFechado()
 {
     debounceBotao(&sensorFechado);
+    sensorAberto.pressed = false;
+    sensorMeio.pressed = false;
 };
 void IRAM_ATTR interrupcaoMeio()
 {
     debounceBotao(&sensorMeio);
+    sensorAberto.pressed = false;
+    sensorFechado.pressed = false;
 };
 void IRAM_ATTR interrupcaoAberto()
 {
     debounceBotao(&sensorAberto);
+    sensorMeio.pressed = false;
+    sensorFechado.pressed = false;
 };
 
 void debounceBotao(Button *button)
@@ -231,6 +201,42 @@ void debounceBotao(Button *button)
         button->lastBounceTime = millis();
     }
 }
+
+void acaoSensores()
+{
+    if (sensorAberto.pressed && estadoPortao != ABERTO)
+    {
+        estadoPortao = ABERTO;
+        Serial.println("Aberto");
+        hora = ntp.getFormattedTime();
+        writeFile("Foi aberto", fileName, hora);
+        client.publish("/mosquitto/portao/estadoSensores", "Aberto");
+    }
+    else if (sensorMeio.pressed && estadoPortao != MEIO)
+    {
+        estadoPortao = MEIO;
+        Serial.println("Meio");
+        hora = ntp.getFormattedTime();
+        writeFile("Passou pelo meio", fileName, hora);
+        client.publish("/mosquitto/portao/estadoSensores", "Meio");
+    }
+    else if (sensorFechado.pressed && estadoPortao != FECHADO)
+    {
+        estadoPortao = FECHADO;
+        timerStop(Timer0_Cfg);
+        timerWrite(Timer0_Cfg, 0);
+        Serial.println("Fechado");
+        hora = ntp.getFormattedTime();
+        writeFile("Fechou", fileName, hora);
+        client.publish("/mosquitto/portao/estadoSensores", "Fechado");
+    }
+    // se nenhum sersor está pressionado, o portão está em movimento
+    if (!sensorAberto.pressed && !sensorMeio.pressed && !sensorFechado.pressed && estadoPortao != MOVIMENTO)
+    {
+        estadoPortao = MOVIMENTO;
+        timerStart(Timer0_Cfg);
+    }
+};
 
 //.................................................................
 void openFS(void)
@@ -326,13 +332,12 @@ void ControleRemotoPortao(void *parameter)
     }
 }
 
-void reconectMqtt(void *paramter){
-  if (client.connected())
-    {
-      vTaskSuspend(NULL);
-    }
+void taskReconect(void *paramter){
   while(1) {
-    if (!client.connected())
+    if(WiFi.status() != WL_CONNECTED){
+      connectWiFi();
+    }
+    if (!client.connected() && WiFi.status() == WL_CONNECTED)
     {                // Se MQTT não estiver conectado tenta reconectar
         reconnect();
         if (client.connected())
@@ -346,7 +351,7 @@ void reconectMqtt(void *paramter){
         }
     }
     client.loop();
-    vTaskDelay(pdMS_TO_TICKS(1000));
+    vTaskDelay(pdMS_TO_TICKS(2500));
   }
 }
 
@@ -368,9 +373,9 @@ void publicarConsultarMqtt(void *paramter) {
 
 void setup()
 {
-    pinMode(sensorAberto.PIN, INPUT);
-    pinMode(sensorMeio.PIN, INPUT);
-    pinMode(sensorFechado.PIN, INPUT);
+    pinMode(sensorAberto.PIN, INPUT_PULLUP);
+    pinMode(sensorMeio.PIN, INPUT_PULLUP);
+    pinMode(sensorFechado.PIN, INPUT_PULLUP);
     attachInterrupt(sensorAberto.PIN, interrupcaoAberto, CHANGE);
     attachInterrupt(sensorMeio.PIN, interrupcaoMeio, CHANGE);
     attachInterrupt(sensorFechado.PIN, interrupcaoFechado, CHANGE);
@@ -382,6 +387,7 @@ void setup()
 
     formatFile();
     openFS();
+    delay(1000);
 
     Timer0_Cfg = timerBegin(80);
     timerWrite(Timer0_Cfg, 0);
@@ -399,7 +405,7 @@ void setup()
     client.setCallback(callback);
     
     xTaskCreatePinnedToCore(
-        reconectMqtt,
+        taskReconect,
         "Task reconect MQTT",
         4096,
         NULL,

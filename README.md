@@ -31,7 +31,7 @@ Projeto que visa monitorar um portão elétrico de trilho com Esp32. É verifica
 
 <h2>Montagem</h2>
 
-- Os pinos 4, 18 e 19 são os pinos bara os sensores em ordem da direção do motor do portão para a tranca do portão. O 4 é para o sensor totalmente aberto, o 18 para o no meio do percurso e o 19 para o sensor onde fica a tranca indicando que o portão está fechado.
+- Os pinos 12, 18 e 21 são os pinos bara os sensores em ordem da direção do motor do portão para a tranca do portão. O 12 é para o sensor totalmente aberto, o 18 para o no meio do percurso e o 21 para o sensor onde fica a tranca indicando que o portão está fechado.
 
 - O LED é para indicar que a conexão com o Wifi foi bem sucedida.
 
