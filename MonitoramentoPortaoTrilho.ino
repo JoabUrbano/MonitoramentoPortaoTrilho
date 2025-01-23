@@ -29,8 +29,8 @@ enum EstadoPortao
 enum EstadoPortao estadoPortao;
 
 #define LEDWifi 2
-#define wifi_ssid "brisa-1404984"
-#define wifi_password "uihbywuq"
+#define wifi_ssid "ssid"
+#define wifi_password "password"
 #define botaoControleAbrir 23
 #define botaoControleFechar 22
 
@@ -43,8 +43,8 @@ int wifi_timeout = 10000;
 WiFiClient wifi_client;
 PubSubClient client(wifi_client);
 
-const char *mqtt_broker = "YourBroker";
-const int mqtt_port = 8883;
+const char *mqtt_broker = "test.mosquitto.org";
+const int mqtt_port = 1883;
 
 bool comandoAbrir = false;
 bool comandoFechar = false;
@@ -95,7 +95,7 @@ void reconnect()
     if (!client.connected())
     {
         Serial.print("Tentando conexão MQTT...");
-        if (client.connect("ESP32Client", "mosquitto", "mosquitto"))
+        if (client.connect("ESP32Client"))
         {
             Serial.println("Conectado");
             // Subscribe
