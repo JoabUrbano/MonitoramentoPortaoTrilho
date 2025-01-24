@@ -39,5 +39,4 @@ Projeto que visa monitorar um portão elétrico de trilho com Esp32. É verifica
 
 <h3>Autores</h3>
 <a href="https://github.com/JoabUrbano">Joab Urbano</a><br>
-<a href="https://github.com/GabrielNSD">Gabriel Dantas</a><br>
-<a href="">João Pedro</a>
+<a href="https://github.com/GabrielNSD">Gabriel Dantas</a>

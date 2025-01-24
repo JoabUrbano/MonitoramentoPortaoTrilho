@@ -7,7 +7,11 @@
 
 #include <PubSubClient.h>
 
-std::queue<String> filaDeStrings;
+#define LEDWifi 2
+#define wifi_ssid "ssid"
+#define wifi_password "password"
+#define botaoControleAbrir 23
+#define botaoControleFechar 22
 
 struct Button
 {
@@ -28,12 +32,6 @@ enum EstadoPortao
 
 enum EstadoPortao estadoPortao;
 
-#define LEDWifi 2
-#define wifi_ssid "ssid"
-#define wifi_password "password"
-#define botaoControleAbrir 23
-#define botaoControleFechar 22
-
 Button sensorAberto = {12, false, LOW, LOW, 0};
 Button sensorMeio = {18, false, LOW, LOW, 0};
 Button sensorFechado = {21, false, LOW, LOW, 0};
@@ -51,6 +49,7 @@ bool comandoFechar = false;
 bool mqtt_connected = false;
 
 /* Variaveis de arquivo */
+std::queue<String> filaDeStrings;
 String path, state;
 String fileName = "/statusLogs.txt";
 int maxLines = 10;
